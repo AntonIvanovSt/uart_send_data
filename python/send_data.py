@@ -1,51 +1,58 @@
 import serial
 import time
-import argparse
 
-def read_args():
-    parser = argparse.ArgumentParser(
-        description='Send commands to ESP32 via Serial')
 
-    parser.add_argument('-m',
-                        '--mode',
-                        default='ON',
-                        help='LED mode (ON/OFF)',
-                        choices=['ON', 'OFF']
-                        )
+def create_message(mode, freq):
+    if mode == "OFF":
+        freq = 0
+    else:
+        freq = abs(freq)
 
-    parser.add_argument('-f',
-                        '--freq',
-                        type=int,
-                        default=0,
-                        help='LED blink frequency (default: 0)'
-                        )
+    message = f"{mode},{freq}\n"
 
-    args = parser.parse_args()
-    return args
+    return message
+
+
+def prompt_command():
+    while True:
+        try:
+            raw = input("Enter command or 'q' to quit: ").strip()
+            if raw.lower() == "q":
+                return None
+            parts = raw.split(",")
+            if len(parts) != 2:
+                print("Invalid format.")
+                continue
+            mode = parts[0].strip().upper()
+            if mode not in ("ON", "OFF"):
+                print("Mode must be ON or OFF")
+                continue
+            freq = int(parts[1].strip())
+            return create_message(mode, freq)
+        except ValueError:
+            print("Parse error")
+
 
 def main():
-    port = '/dev/ttyACM0'
+    port = "/dev/ttyACM0"
     baud_rate = 460800
     ser = None
-
-    args = read_args()
 
     try:
         # Open serial port
         ser = serial.Serial(port, baud_rate, timeout=1)
-        # time.sleep(1)  # Wait for connection to establish
+        time.sleep(1)  # Wait for connection to establish
 
-        print("Sending message to ESP32...")
-
-        if args.mode == 'OFF':
-            args.freq = 0
-        else:
-            args.freq = abs(args.freq)
-
-        message = f"{args.mode},{args.freq}\n"
-
-        ser.write(message.encode('utf-8'))
-        print(f"Sent: {message.strip()}")
+        while True:
+            message = prompt_command()
+            if message is None:
+                print("Exiting")
+                message = "OFF,0\n"
+                ser.write(message.encode("utf-8"))
+                print(f"Sent: {message.strip()}")
+                break
+            ser.write(message.encode("utf-8"))
+            print(f"Sent: {message.strip()}")
 
     except serial.SerialException as e:
         print(f"Serial port error: {e}")
@@ -53,7 +60,7 @@ def main():
         print("  - Device is connected")
         print("  - Port /dev/ttyACM0 exists")
         print("  - You have permissions (try: sudo usermod -a -G dialout $USER)")
-        
+
     except PermissionError:
         print("Permission denied accessing /dev/ttyACM0")
         print("Run: sudo chmod 666 /dev/ttyACM0")
@@ -61,7 +68,8 @@ def main():
 
     except KeyboardInterrupt:
         print("\nExiting.")
-
+    except Exception as e:
+        print(f"Unexpected error: {type(e).__name__}: {e}")
     finally:
         if ser is not None and ser.is_open:
             print("Close serial port.")
