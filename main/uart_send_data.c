@@ -6,6 +6,7 @@
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "hal/gpio_types.h"
+#include "portmacro.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +46,16 @@ static void parse_blink_cmd(char *buffer) {
             ESP_LOGI(TAG, "LED OFf");
             led_on = 0;
         }
+
+        char reply[64];
+        int reply_len =
+            snprintf(reply, sizeof(reply), "Mode set to %s, %d\n", mode, freq);
+        usb_serial_jtag_write_bytes((uint8_t *)reply, reply_len,
+                                    100 / portTICK_PERIOD_MS);
     } else {
+        const char *err = "Parse error\n";
+        usb_serial_jtag_write_bytes((uint8_t *)err, strlen(err),
+                                    100 / portTICK_PERIOD_MS);
         ESP_LOGW(TAG, "Parse error");
     }
 }
